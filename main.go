@@ -1,10 +1,12 @@
 package main
 
 import (
+	"image/color"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -28,6 +30,10 @@ var labelOldPos = widget.NewLabel("")
 
 var craneTurn bool = false // Если ручку крана не поворачивали не показываем предыдущее положение
 
+var redLine1 = canvas.NewLine(color.NRGBA{255, 0, 0, 255})
+
+var redLine2 = canvas.NewLine(color.NRGBA{255, 0, 0, 255})
+
 func main() {
 	a := app.New()
 	a.Settings().SetTheme(theme.DarkTheme())
@@ -36,23 +42,29 @@ func main() {
 	w.SetFixedSize(true)
 	w.CenterOnScreen()
 
-	// labelNull := widget.NewLabel("")
+	labelCurPos.TextStyle = fyne.TextStyle{Bold: true}
 
-	topLabel := container.NewVBox(
+	redLine1.StrokeWidth = 5
+	redLine1.Hide()
+	redLine2.StrokeWidth = 5
+	redLine2.Hide()
+
+	content := container.NewVBox(
 		labelConnect,
 		labelSpace,
+		redLine1,
 		labelHeadCurPos,
 		labelCurPos,
+		redLine2,
 		labelSpace,
 		labelHeadOldPos,
 		labelOldPos,
 	)
 
-	content := container.NewWithoutLayout(topLabel) // создаем специальный контейнер в котором будут размещаться элементы (положение)
-
 	w.SetContent(content)
 
 	go connectCAN()
+	go threadActivity()
 	go processCAN()
 	go processScreen()
 
@@ -67,6 +79,7 @@ func main() {
 
 func resetInfo() {
 	bConnected = false
+	craneTurn = false
 }
 
 func processScreen() {
@@ -83,16 +96,18 @@ func processScreen() {
 		if bOkCAN {
 			if bConnected {
 				stringConnected = "Соединено с ККМ"
-				stringHeadCurPos = "Текущее положение"
+				stringHeadCurPos = "Текущее положение:"
 				stringCurPos = CurPos.NamePos()
+				redLine1.Show()
+				redLine2.Show()
 				if craneTurn {
-					stringHeadOldPos = "Предыдущее  положение"
+					stringHeadOldPos = "Предыдущее  положение:"
 					stringOldPos = OldPos.NamePos()
 				}
-
 			} else {
-
 				stringConnected = "Ожидание соединения с ККМ..."
+				redLine1.Hide()
+				redLine2.Hide()
 
 			}
 		} else {
@@ -127,17 +142,25 @@ func connectCAN() {
 	}
 }
 
+// Проверяем наличие связи с ИПТМ по выдаваемым им сообщениям
+func threadActivity() {
+	for {
+		_, err1 := can.GetMsgByID(KKM_ID, 2*time.Second)
+		if err1 != nil {
+			resetInfo()
+		} else {
+			bConnected = true
+		}
+	}
+}
+
 func processCAN() {
 	<-canOk
 	ch, _ := can.GetMsgChannelCopy()
-	var posDefine bool
 	var newPos KKMPosition
 	for msg := range ch {
-
-		if msg.ID == KKM_ID {
-			bConnected = true // Проверяем наличие связи с ИПТМ по выдаваемым им сообщениям
-			posDefine = false
-			for !posDefine {
+		if bConnected {
+			for {
 				if msg.Data[0] == gCANPosValues[newPos][0] && msg.Data[1] == gCANPosValues[newPos][1] {
 
 					if CurPos != newPos {
@@ -145,19 +168,16 @@ func processCAN() {
 							OldPos = CurPos
 							craneTurn = true
 						}
-
 						CurPos = newPos
 					}
-					newPos = 0
-					posDefine = true
-
+					break
 				} else {
 					newPos++
 				}
 			}
-		} else {
-			resetInfo()
 		}
+
+		newPos = 0
 
 		time.Sleep(20 * time.Millisecond)
 
