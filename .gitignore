@@ -1,0 +1,9 @@
+*.exe
+*.bin
+*.png
+*.cmd
+
+.vscode/
+.svn/
+
+code.go
