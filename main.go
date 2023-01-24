@@ -145,11 +145,12 @@ func connectCAN() {
 // Проверяем наличие связи с ИПТМ по выдаваемым им сообщениям
 func threadActivity() {
 	for {
-		_, err1 := can.GetMsgByID(KKM_ID, 2*time.Second)
-		if err1 != nil {
-			resetInfo()
-		} else {
+		_, err1 := can.GetMsgByID(KKM_ID1, 2*time.Second)
+		_, err2 := can.GetMsgByID(KKM_ID2, 2*time.Second)
+		if err1 == nil || err2 == nil {
 			bConnected = true
+		} else {
+			resetInfo()
 		}
 	}
 }
