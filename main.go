@@ -28,7 +28,7 @@ var labelCurPos = widget.NewLabel("")
 var labelHeadOldPos = widget.NewLabel("")
 var labelOldPos = widget.NewLabel("")
 
-var craneTurn bool = false // Если ручку крана не поворачивали не показываем предыдущее положение
+var craneTurn bool = false // If the crane handle was not turned, we do not show the previous position
 
 var redLine1 = canvas.NewLine(color.NRGBA{255, 0, 0, 255})
 
@@ -64,7 +64,6 @@ func main() {
 	w.SetContent(content)
 
 	go connectCAN()
-	go threadActivity()
 	go processCAN()
 	go processScreen()
 
@@ -125,7 +124,7 @@ func processScreen() {
 	}
 }
 
-// Определяем наличие CAN адаптера
+// We determine the presence of a CAN adapter
 func connectCAN() {
 	var err error
 	can, err = b.Speed(ixxatvci3.Bitrate25kbps).Get()
@@ -142,7 +141,7 @@ func connectCAN() {
 	}
 }
 
-// Проверяем наличие связи с ИПТМ по выдаваемым им сообщениям
+// We check the availability of communication by the messages issued to them
 func threadActivity() {
 	for {
 		_, err1 := can.GetMsgByID(KKM_ID1, 2*time.Second)
@@ -156,14 +155,23 @@ func threadActivity() {
 }
 
 func processCAN() {
+
 	<-canOk
-	ch, _ := can.GetMsgChannelCopy()
+	bOkCAN = true
 	var newPos KKMPosition
+
+	ch, _ := can.GetMsgChannelCopy()
+	go threadActivity()
+
 	for msg := range ch {
-		if bConnected {
+
+		switch msg.ID {
+		case KKM_ID1:
+			fallthrough
+		case KKM_ID2:
+
 			for {
 				if msg.Data[0] == gCANPosValues[newPos][0] && msg.Data[1] == gCANPosValues[newPos][1] {
-
 					if CurPos != newPos {
 						if OldPos != CurPos {
 							OldPos = CurPos
@@ -179,8 +187,6 @@ func processCAN() {
 		}
 
 		newPos = 0
-
 		time.Sleep(20 * time.Millisecond)
-
 	}
 }
