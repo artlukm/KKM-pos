@@ -158,35 +158,26 @@ func processCAN() {
 
 	<-canOk
 	bOkCAN = true
-	var newPos KKMPosition
 
 	ch, _ := can.GetMsgChannelCopy()
 	go threadActivity()
 
 	for msg := range ch {
-
 		switch msg.ID {
-		case KKM_ID1:
-			fallthrough
-		case KKM_ID2:
-
-			for {
+		case KKM_ID1, KKM_ID2:
+			for newPos := range posNum {
 				if msg.Data[0] == gCANPosValues[newPos][0] && msg.Data[1] == gCANPosValues[newPos][1] {
-					if CurPos != newPos {
+					if CurPos != KKMPosition(newPos) {
 						if OldPos != CurPos {
 							OldPos = CurPos
 							craneTurn = true
 						}
-						CurPos = newPos
+						CurPos = KKMPosition(newPos)
 					}
 					break
-				} else {
-					newPos++
 				}
 			}
 		}
-
-		newPos = 0
 		time.Sleep(20 * time.Millisecond)
 	}
 }
